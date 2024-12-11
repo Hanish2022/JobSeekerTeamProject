@@ -21,55 +21,70 @@ const AdminJobsTable = () => {
   const { allAdminJobs, searchJobByText } = useSelector((store) => store.job);
 
   const [filterJobs, setFilterJobs] = useState(allAdminJobs);
+  const [currentPage, setCurrentPage] = useState(1);
+  const jobsPerPage = 5; // Number of jobs per page
+
   const navigate = useNavigate();
 
-  useEffect(() => {
-    const filteredJobs = allAdminJobs.filter((job) => {
-      if (!searchJobByText) {
-        return true;
-      }
-      return (
-        job?.title?.toLowerCase().includes(searchJobByText.toLowerCase()) ||
-        job?.company?.name.toLowerCase().includes(searchJobByText.toLowerCase())
-      );
+ useEffect(() => {
+   const filteredJobs = allAdminJobs
+     .filter((job) => {
+       if (!searchJobByText) {
+         return true;
+       }
+       return (
+         job?.title?.toLowerCase().includes(searchJobByText.toLowerCase()) ||
+         job?.company?.name
+           .toLowerCase()
+           .includes(searchJobByText.toLowerCase())
+       );
+     })
+     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)); // Sort by createdAt descending
+
+   setFilterJobs(filteredJobs);
+ }, [allAdminJobs, searchJobByText]);
+
+
+  const downloadPDF = () => {
+    if (!filterJobs || filterJobs.length === 0) {
+      alert("No jobs data available to download!");
+      return;
+    }
+
+    const doc = new jsPDF();
+    const tableColumn = ["Company Name", "Role", "Date", "Description"];
+    const tableRows = [];
+
+    filterJobs.forEach((job) => {
+      const jobData = [
+        job?.company?.name || "N/A",
+        job?.title || "N/A",
+        job?.createdAt?.split("T")[0] || "N/A",
+        job?.description,
+      ];
+      tableRows.push(jobData);
     });
-    setFilterJobs(filteredJobs);
-  }, [allAdminJobs, searchJobByText]);
 
- const downloadPDF = () => {
-   if (!filterJobs || filterJobs.length === 0) {
-     alert("No jobs data available to download!");
-     return;
-   }
+    doc.text("Jobs Report", 14, 14);
+    doc.autoTable({
+      head: [tableColumn],
+      body: tableRows,
+      startY: 20,
+      theme: "grid",
+      headStyles: { fillColor: [46, 204, 113] }, // Green color for the header
+      bodyStyles: { fillColor: [229, 244, 234] }, // Light green color for rows
+      alternateRowStyles: { fillColor: [204, 235, 216] }, // Alternate row color
+    });
 
-   const doc = new jsPDF();
-   const tableColumn = ["Company Name", "Role", "Date","Description"];
-   const tableRows = [];
+    doc.save("jobs-report.pdf");
+  };
 
-   filterJobs.forEach((job) => {
-     const jobData = [
-       job?.company?.name || "N/A",
-       job?.title || "N/A",
-       job?.createdAt?.split("T")[0] || "N/A",
-       job?.description,
-     ];
-     tableRows.push(jobData);
-   });
+  // Calculate jobs to display on the current page
+  const startIndex = (currentPage - 1) * jobsPerPage;
+  const currentJobs = filterJobs.slice(startIndex, startIndex + jobsPerPage);
 
-   doc.text("Jobs Report", 14, 14);
-   doc.autoTable({
-     head: [tableColumn],
-     body: tableRows,
-     startY: 20,
-     theme: "grid",
-     headStyles: { fillColor: [46, 204, 113] }, // Green color for the header
-     bodyStyles: { fillColor: [229, 244, 234] }, // Light green color for rows
-     alternateRowStyles: { fillColor: [204, 235, 216] }, // Alternate row color
-   });
-
-   doc.save("jobs-report.pdf");
- };
-
+  // Calculate total pages
+  const totalPages = Math.ceil(filterJobs.length / jobsPerPage);
 
   return (
     <div>
@@ -87,7 +102,7 @@ const AdminJobsTable = () => {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {filterJobs?.map((job) => (
+          {currentJobs?.map((job) => (
             <TableRow key={job._id}>
               <TableCell>{job?.company?.name}</TableCell>
               <TableCell>{job?.title}</TableCell>
@@ -96,6 +111,7 @@ const AdminJobsTable = () => {
                 <Popover>
                   <PopoverTrigger>
                     <MoreHorizontal />
+      
                   </PopoverTrigger>
                   <PopoverContent className="w-32">
                     <div
@@ -121,6 +137,23 @@ const AdminJobsTable = () => {
           ))}
         </TableBody>
       </Table>
+      <div className="flex justify-between items-center mt-4">
+        <Button
+          disabled={currentPage === 1}
+          onClick={() => setCurrentPage((prev) => prev - 1)}
+        >
+          Previous
+        </Button>
+        <span>
+          Page {currentPage} of {totalPages}
+        </span>
+        <Button
+          disabled={currentPage === totalPages}
+          onClick={() => setCurrentPage((prev) => prev + 1)}
+        >
+          Next
+        </Button>
+      </div>
     </div>
   );
 };
